@@ -2,10 +2,12 @@
 {
     public class FixedSlot
     {
-        public Guid Id { get; set; }
+        public int Id { get; set; }
         public DateTime FixationTime { get; set; }
+        public bool IsFixed { get; set; }
 
-        public ParkingSlot ParkingSlot { get; set; }
-        public User User { get; set; }
+        public ParkingSlot ParkingSlot { get; set; } = null!;
+        public User User { get; set; } = null!;
+
     }
 }

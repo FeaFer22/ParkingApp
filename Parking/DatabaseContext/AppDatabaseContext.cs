@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ParkingApp.Models;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace ParkingApp.DatabaseContext
 {
@@ -8,10 +9,9 @@ namespace ParkingApp.DatabaseContext
         public DbSet<ParkingSlot> ParkingSlots { get; set; }
         public DbSet<FixedSlot> FixedSlots { get; set; }
         public DbSet<User> Users { get; set; }
-        public AppDatabaseContext(DbContextOptions<AppDatabaseContext> options) : base(options) { }
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        {
-            base.OnConfiguring(optionsBuilder);
+        public AppDatabaseContext(DbContextOptions<AppDatabaseContext> options) : base(options) 
+        { 
+            Database.EnsureCreated();
         }
     }
 }
