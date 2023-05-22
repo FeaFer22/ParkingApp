@@ -1,4 +1,6 @@
-﻿namespace ParkingApp.Models
+﻿using ParkingApp.DTO;
+
+namespace ParkingApp.Models
 {
     public class FixedSlot
     {
@@ -7,7 +9,7 @@
         public bool IsFixed { get; set; }
 
         public ParkingSlot ParkingSlot { get; set; } = null!;
-        public User User { get; set; } = null!;
+        public User User { get; set; }
 
     }
 }

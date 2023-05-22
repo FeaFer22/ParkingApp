@@ -31,7 +31,6 @@ namespace ParkingApp.Controllers
             _options = options.Value;
             _dapperContext = dapperContext;
         }
-        //TODO: Add registration by login and password
 
         #region Register
 
@@ -44,7 +43,7 @@ namespace ParkingApp.Controllers
             user.LastName = lastName;
             user.MiddleName = middleName;
             user.ContactNumber = contactNumber;
-            user.LicensePlate = userEntry.LicensePlate;
+            user.LicensePlate = userEntry.LicensePlate.ToUpper();
             user.PasswordHash = passwordHash;
             user.PasswordSalt = passwordSalt;
 
@@ -62,7 +61,7 @@ namespace ParkingApp.Controllers
                 user.FirstName,
                 user.MiddleName,
                 user.ContactNumber,
-                licensePlate = user.LicensePlate.ToUpper(),
+                user.LicensePlate,
                 user.PasswordHash,
                 user.PasswordSalt
             }, commandType: CommandType.StoredProcedure);
@@ -89,17 +88,18 @@ namespace ParkingApp.Controllers
 
         #endregion
 
+        #region Login And Creating JWT
         [HttpPost("Login")]
         public async Task<ActionResult> Login(string licensePlate, string password)
         {
 
             using var connection = _dapperContext.CreateConnection();
             var getUserData = await connection.QueryAsync<User>("[dbo].[GetUserEntry]",
-                new { LicensePlate = licensePlate.ToUpper() }, commandType: CommandType.StoredProcedure);
+                new { LicensePlate = licensePlate }, commandType: CommandType.StoredProcedure);
 
             user = getUserData.FirstOrDefault();
 
-            if (user.LicensePlate != licensePlate)
+            if (user.LicensePlate != licensePlate.ToUpper())
             {
                 return BadRequest("Пользователь не найден.");
             }
@@ -109,12 +109,12 @@ namespace ParkingApp.Controllers
                 return BadRequest("Неверный пароль.");
             }
 
-            return Ok(GetJwtToken(user));
+            return Ok(CreateJwt(user));
         }
 
 
-        [HttpGet("GetJwtToken")]
-        public string GetJwtToken(User user)
+        [HttpGet("CreateJwt")]
+        public string CreateJwt(User user)
         {
             var claims = new Claim[] {
                     new Claim(ClaimTypes.Name,user.LicensePlate),
@@ -127,12 +127,15 @@ namespace ParkingApp.Controllers
                     issuer: _options.Issuer,
                     audience: _options.Audience,
                     claims: claims,
-                    expires: DateTime.UtcNow.Add(TimeSpan.FromMinutes(5)),
+                    expires: DateTime.UtcNow.Add(TimeSpan.FromMinutes(15)),
                     notBefore: DateTime.UtcNow,
                     signingCredentials: new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256)
                 );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        #endregion
+
     }
 }

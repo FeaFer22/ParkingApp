@@ -1,14 +1,10 @@
 ﻿using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 using ParkingApp.DatabaseContext;
 using ParkingApp.DTO;
 using ParkingApp.Models;
-using System.Diagnostics;
+using System.Data;
 
 namespace ParkingApp.Controllers
 {
@@ -20,6 +16,8 @@ namespace ParkingApp.Controllers
         private readonly AppDatabaseContext _databaseContext;
         private readonly DapperContext _dapperContext;
 
+        private static UserDTO? userDTO;
+
         public ParkingController(AppDatabaseContext databaseContext, DapperContext dapperContext)
         {
             this._databaseContext = databaseContext;
@@ -27,24 +25,27 @@ namespace ParkingApp.Controllers
         }
 
         [HttpGet("GetUserByLicensePlate")]
-        public async Task<IActionResult> GetUserByLicensePlate(string licensePlate)
+        public async Task<ActionResult<UserDTO>> GetUserByLicensePlate(string licensePlate)
         {
             using var connection = _dapperContext.CreateConnection();
             var getUserData = await connection.QueryAsync<UserDTO>("[dbo].[GetUserByLicensePlate]", 
-                new {LicensePlate = licensePlate.ToUpper()}, commandType:System.Data.CommandType.StoredProcedure);
+                new {LicensePlate = licensePlate.ToUpper()}, commandType:CommandType.StoredProcedure);
 
-            if(getUserData != null && getUserData.Count() != 0)
+            userDTO = getUserData.FirstOrDefault();
+
+            if(userDTO != null)
             {
-                return Ok(getUserData.FirstOrDefault());
+                return userDTO;
             }
             return BadRequest($"Пользователь с номером {licensePlate} не найден.");
         }
 
         [HttpGet("GetAllParkingSlots")]
-        public List<ParkingSlot> GetParkingSlots()
+        public async Task<List<ParkingSlot>> GetParkingSlots()
         {
-            var parkSlots = _databaseContext.ParkingSlots.FromSqlRaw("GetAllParkingSlots").ToList();
-            return parkSlots;
+            using var connection = _dapperContext.CreateConnection();
+            var parkSlots = await connection.QueryAsync<ParkingSlot>("[dbo].[GetAllParkingSlots]", commandType: CommandType.StoredProcedure);
+            return parkSlots.ToList();
         }
 
         //TODO: Add parking slot fixation

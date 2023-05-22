@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ParkingApp.DTO;
 using ParkingApp.Models;
 
 namespace ParkingApp.DatabaseContext
