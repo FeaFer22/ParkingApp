@@ -48,7 +48,7 @@ namespace ParkingApp.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("FixedSlots");
+                    b.ToTable("FixedSlots", (string)null);
                 });
 
             modelBuilder.Entity("ParkingApp.Models.ParkingSlot", b =>
@@ -65,7 +65,7 @@ namespace ParkingApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ParkingSlots");
+                    b.ToTable("ParkingSlots", (string)null);
                 });
 
             modelBuilder.Entity("ParkingApp.Models.User", b =>
@@ -80,7 +80,11 @@ namespace ParkingApp.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FullName")
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -88,13 +92,21 @@ namespace ParkingApp.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Password")
+                    b.Property<string>("MiddleName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<byte[]>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<byte[]>("PasswordSalt")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("ParkingApp.Models.FixedSlot", b =>

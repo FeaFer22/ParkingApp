@@ -12,7 +12,7 @@ using ParkingApp.DatabaseContext;
 namespace ParkingApp.Migrations
 {
     [DbContext(typeof(AppDatabaseContext))]
-    [Migration("20230503205638_initial")]
+    [Migration("20230522151930_initial")]
     partial class initial
     {
         /// <inheritdoc />
@@ -83,7 +83,11 @@ namespace ParkingApp.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FullName")
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -91,9 +95,17 @@ namespace ParkingApp.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Password")
+                    b.Property<string>("MiddleName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<byte[]>("PasswordSalt")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
 
                     b.HasKey("Id");
 

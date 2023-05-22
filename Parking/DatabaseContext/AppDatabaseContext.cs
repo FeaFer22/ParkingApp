@@ -9,7 +9,7 @@ namespace ParkingApp.DatabaseContext
         public DbSet<FixedSlot> FixedSlots { get; set; }
         public DbSet<User> Users { get; set; }
         public AppDatabaseContext(DbContextOptions<AppDatabaseContext> options) : base(options) 
-        { 
+        {
             Database.EnsureCreated();
         }
     }
