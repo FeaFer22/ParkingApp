@@ -1,5 +1,6 @@
 ﻿using Dapper;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,13 @@ namespace ParkingApp.Controllers
         private readonly DapperContext _dapperContext;
         public static User user = new User();
 
+        private static User _user;
+        public static User User
+        {
+            get { return _user; }
+            set { _user = value; }
+        }
+
         public LoginController(IOptions<JWTSettings> options, DapperContext dapperContext)
         {
             _options = options.Value;
@@ -35,37 +43,51 @@ namespace ParkingApp.Controllers
         #region Register
 
         [HttpPost("Register")]
-        public async Task<ActionResult<User>> Register(UserEntryDTO userEntry, string firstName, string middleName, string lastName, string contactNumber)
+        public async Task<ActionResult<User>> Register(UserEntryDTO userEntry, string lastName, string firstName, string middleName, string contactNumber)
         {
-            CreatePasswordHash(userEntry.Password, out byte[] passwordHash, out byte[] passwordSalt);
+            try
+            {
+                CreatePasswordHash(userEntry.Password, out byte[] passwordHash, out byte[] passwordSalt);
 
-            user.FirstName = firstName;
-            user.LastName = lastName;
-            user.MiddleName = middleName;
-            user.ContactNumber = contactNumber;
-            user.LicensePlate = userEntry.LicensePlate.ToUpper();
-            user.PasswordHash = passwordHash;
-            user.PasswordSalt = passwordSalt;
+                user.FirstName = firstName;
+                user.LastName = lastName;
+                user.MiddleName = middleName;
+                user.ContactNumber = contactNumber;
+                user.LicensePlate = userEntry.LicensePlate.ToUpper();
+                user.PasswordHash = passwordHash;
+                user.PasswordSalt = passwordSalt;
 
-            var result = AddUser(user);
+                var result = AddUser(user);
 
-            return Ok();
+                return Ok();
+            }
+            catch (SqlException)
+            {
+                return BadRequest("Can't reach the server.");
+            }
         }
 
         private IActionResult AddUser(User user)
         {
-            using var connection = _dapperContext.CreateConnection();
-            var insertUserData = connection.ExecuteScalar<User>("[dbo].[AddUser]", new
+            try
             {
-                user.LastName,
-                user.FirstName,
-                user.MiddleName,
-                user.ContactNumber,
-                user.LicensePlate,
-                user.PasswordHash,
-                user.PasswordSalt
-            }, commandType: CommandType.StoredProcedure);
-            return Ok();
+                using var connection = _dapperContext.CreateConnection();
+                var insertUserData = connection.ExecuteScalar<User>("[dbo].[AddUser]", new
+                {
+                    user.LastName,
+                    user.FirstName,
+                    user.MiddleName,
+                    user.ContactNumber,
+                    user.LicensePlate,
+                    user.PasswordHash,
+                    user.PasswordSalt
+                }, commandType: CommandType.StoredProcedure);
+                return Ok();
+            }
+            catch (SqlException)
+            {
+                return BadRequest("Can't reach the server.");
+            }
         }
 
         private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
@@ -92,24 +114,34 @@ namespace ParkingApp.Controllers
         [HttpPost("Login")]
         public async Task<ActionResult> Login(string licensePlate, string password)
         {
-
-            using var connection = _dapperContext.CreateConnection();
-            var getUserData = await connection.QueryAsync<User>("[dbo].[GetUserEntry]",
-                new { LicensePlate = licensePlate }, commandType: CommandType.StoredProcedure);
-
-            user = getUserData.FirstOrDefault();
-
-            if (user.LicensePlate != licensePlate.ToUpper())
+            try
             {
+                using var connection = _dapperContext.CreateConnection();
+                var getUserData = await connection.QueryAsync<User>("[dbo].[GetUserEntry]",
+                    new { LicensePlate = licensePlate }, commandType: CommandType.StoredProcedure);
+
+                _user = getUserData.FirstOrDefault();
+                User = _user;
+
+                if (_user != null)
+                {
+                    if (_user.LicensePlate != licensePlate.ToUpper())
+                    {
+                        return BadRequest("Пользователь не найден.");
+                    }
+
+                    if (!VerifyPasswordHash(password, _user.PasswordHash, _user.PasswordSalt))
+                    {
+                        return BadRequest("Неверный пароль.");
+                    }
+                    return Ok(CreateJwt(_user));
+                }
                 return BadRequest("Пользователь не найден.");
             }
-
-            if(!VerifyPasswordHash(password, user.PasswordHash, user.PasswordSalt))
+            catch (SqlException)
             {
-                return BadRequest("Неверный пароль.");
+                return BadRequest("Can't reach the server.");
             }
-
-            return Ok(CreateJwt(user));
         }
 
 

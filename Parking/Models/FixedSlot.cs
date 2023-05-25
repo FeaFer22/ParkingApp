@@ -6,10 +6,10 @@ namespace ParkingApp.Models
     {
         public int Id { get; set; }
         public DateTime FixationTime { get; set; }
-        public bool IsFixed { get; set; }
+        public DateTime FixationEndTime { get; set; }
 
-        public ParkingSlot ParkingSlot { get; set; } = null!;
-        public User User { get; set; }
+        public string ParkingSlotName { get; set; } = null!;
+        public string UserLicensePlate { get; set; } = null!;
 
     }
 }

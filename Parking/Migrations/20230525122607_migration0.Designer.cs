@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ParkingApp.DatabaseContext;
 
@@ -11,9 +12,11 @@ using ParkingApp.DatabaseContext;
 namespace ParkingApp.Migrations
 {
     [DbContext(typeof(AppDatabaseContext))]
-    partial class AppDatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20230525122607_migration0")]
+    partial class migration0
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -36,15 +39,16 @@ namespace ParkingApp.Migrations
                     b.Property<DateTime>("FixationTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ParkingSlotName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("ParkingSlotId")
+                        .HasColumnType("int");
 
                     b.Property<string>("UserLicensePlate")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ParkingSlotId");
 
                     b.ToTable("FixedSlots");
                 });
@@ -108,6 +112,17 @@ namespace ParkingApp.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("ParkingApp.Models.FixedSlot", b =>
+                {
+                    b.HasOne("ParkingApp.Models.ParkingSlot", "ParkingSlot")
+                        .WithMany()
+                        .HasForeignKey("ParkingSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ParkingSlot");
                 });
 #pragma warning restore 612, 618
         }
