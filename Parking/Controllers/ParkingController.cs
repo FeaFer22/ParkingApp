@@ -33,7 +33,6 @@ namespace ParkingApp.Controllers
             set { _user = value; }
         }
 
-
         public ParkingController(AppDatabaseContext databaseContext, DapperContext dapperContext)
         {
             this._databaseContext = databaseContext;
@@ -62,26 +61,44 @@ namespace ParkingApp.Controllers
         public async Task<List<ParkingSlotDTO>> GetAllParkingSlots()
         {
             using var connection = _dapperContext.CreateConnection();
-            var parkSlots = await connection.QueryAsync<ParkingSlotDTO>("[dbo].[GetAllParkingSlots]", 
+            List<ParkingSlotDTO> parkSlots = (List<ParkingSlotDTO>)await connection.QueryAsync<ParkingSlotDTO>("[dbo].[GetAllParkingSlots]", 
                 commandType: CommandType.StoredProcedure);
 
-            return parkSlots.ToList();
+            return parkSlots;
         }
 
         [HttpGet("GetFixedSlotWhereUserLicensePlate")]
-        public async Task<bool> GetFixedSlotWhereUserLicensePlate(string licensePlate)
+        public async Task<FixedSlot> GetFixedSlotWhereUserLicensePlate(string licensePlate)
         {
             using var connection = _dapperContext.CreateConnection();
             var fixedSlotInfoList = await connection.QueryAsync<FixedSlot>("[dbo].[GetFixedSlotWhereUserLicensePlate]",
                 new { UserLicensePlate = licensePlate },
                 commandType: CommandType.StoredProcedure);
-            var fixedSlot = fixedSlotInfoList.FirstOrDefault(); 
+            var fixedSlot = fixedSlotInfoList.FirstOrDefault();
+            return fixedSlot;
+        }
 
-            if(fixedSlot == null)
+        [HttpGet("CheckUserLicensePlate")]
+        public async Task<bool> CheckUserLicensePlate(string licensePlate)
+        {
+            var slotInfo = await GetFixedSlotWhereUserLicensePlate(licensePlate);
+
+            if (slotInfo == null)
             {
                 return false;
             }
+            return true;
+        }
 
+        [HttpGet("CheckFixationIfExists")]
+        public async Task<bool> CheckFixationIfExists(string licensePlate)
+        {
+            var slotInfo = await GetFixedSlotWhereUserLicensePlate(licensePlate);
+
+            if (slotInfo == null)
+            {
+                return false;
+            }
             return true;
         }
 
@@ -105,7 +122,7 @@ namespace ParkingApp.Controllers
                     {
                         if (User != null)
                         {
-                            if (await GetFixedSlotWhereUserLicensePlate(User.LicensePlate) == false)
+                            if (await CheckUserLicensePlate(User.LicensePlate) == false)
                             {
                                 selectedSlot.Id = parkingSlot.Id;
                                 selectedSlot.Name = parkingSlot.Name.ToUpper();
@@ -147,7 +164,7 @@ namespace ParkingApp.Controllers
                                     return BadRequest(e.Message);
                                 }
                             }
-                            return BadRequest("Нельзя забронировать больше одного места.");
+                            return BadRequest("Невозможно забронировать больше одного места.");
                         }
                         else
                         {
@@ -159,39 +176,27 @@ namespace ParkingApp.Controllers
             return BadRequest("Слот не найден.");
         }
 
-        //[HttpPost("UnFixParkingSlot")]
-        //public async Task<ActionResult> UnFixParkingSlot(string unFixSlotName)
-        //{
-        //    if (User != null && User.LicensePlate == LoginController.User.LicensePlate)
-        //    {
-        //        using var connection = _dapperContext.CreateConnection();
+        [HttpPost("UnFixParkingSlot")]
+        public async Task<ActionResult> UnFixParkingSlot(string unFixSlotName)
+        {
+            if(User != null)
+            {
+                if (await CheckFixationIfExists(User.LicensePlate) == false)
+                {
+                    return BadRequest("Бронь не найдена или невозможно убрать чужую бронь.");
+                }
+                if (await CheckUserLicensePlate(User.LicensePlate) == true)
+                {
+                    using var connection = _dapperContext.CreateConnection();
 
-        //        var fixedSlotsInfo = await connection.QueryAsync<FixedSlot>("[dbo].[GetFixedSlots]",
-        //            new { licensePlate = LoginController.User.LicensePlate },
-        //            commandType: CommandType.StoredProcedure);
-        //        string parkingSlotNameUpper = unFixSlotName;
-
-        //        if(fixedSlotsInfo != null)
-        //        {
-        //            try
-        //            {
-        //                connection.ExecuteScalar<FixedSlot>("[dbo].[UnFixParkingSlot]",
-        //                    new { ParkingSlotName = parkingSlotNameUpper },
-        //                    commandType: CommandType.StoredProcedure);
-        //            }
-        //            catch(Exception e)
-        //            {
-        //                return BadRequest(e.Message);
-        //            }
-
-        //            connection.ExecuteScalar<ParkingSlot>("[dbo].[FixParkingSlot]",
-        //                new { IsFixed = false, Name = parkingSlotNameUpper },
-        //                commandType: CommandType.StoredProcedure);
-
-        //            return Ok("Success");
-        //        }
-        //    }
-        //    return BadRequest("User is null");
-        //}
+                    var result = await connection.QueryAsync<ParkingSlot>("[dbo].[UnfixParkingSlot]",
+                                                new { parkingSlotName = unFixSlotName },
+                                                commandType: CommandType.StoredProcedure);
+                    return Ok("Бронь удалена.");
+                }
+                return BadRequest("Невозможно убрать чужую бронь.");
+            }
+            return BadRequest("Пользователь не найден");
+        }
     }
 }
