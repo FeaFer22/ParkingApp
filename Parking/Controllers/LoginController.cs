@@ -34,6 +34,13 @@ namespace ParkingApp.Controllers
             set { _user = value; }
         }
 
+        private static string _jwt;
+        public static string Jwt
+        {
+            get { return _jwt; }
+            set { _jwt = value; }
+        }
+
         public LoginController(IOptions<JWTSettings> options, DapperContext dapperContext)
         {
             _options = options.Value;
@@ -134,7 +141,8 @@ namespace ParkingApp.Controllers
                     {
                         return BadRequest("Неверный пароль.");
                     }
-                    return Ok(CreateJwt(_user));
+                    _jwt = CreateJwt(_user);
+                    return Ok(_jwt);
                 }
                 return BadRequest("Пользователь не найден.");
             }
@@ -168,6 +176,5 @@ namespace ParkingApp.Controllers
         }
 
         #endregion
-
     }
 }

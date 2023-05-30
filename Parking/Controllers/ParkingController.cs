@@ -19,11 +19,18 @@ namespace ParkingApp.Controllers
 
         public static UserDTO userDTO;
 
-        private static FixedSlot _fixedSlot;
-        public static FixedSlot FixedSlot
+        private static FixedSlot _fixedSlotInfo;
+        public static FixedSlot FixedSlotInfo
         {
-            get { return _fixedSlot; }
-            set { _fixedSlot = value; }
+            get { return _fixedSlotInfo; }
+            set { _fixedSlotInfo = value; }
+        }
+
+        private static User _user = new User();
+        public static User User
+        {
+            get { return _user; }
+            set { _user = value; }
         }
 
 
@@ -31,6 +38,7 @@ namespace ParkingApp.Controllers
         {
             this._databaseContext = databaseContext;
             _dapperContext = dapperContext;
+            _user = LoginController.User;
         }
 
         [HttpGet("GetUserByLicensePlate")]
@@ -51,94 +59,139 @@ namespace ParkingApp.Controllers
         }
 
         [HttpGet("GetAllParkingSlots")]
-        public async Task<List<ParkingSlot>> GetParkingSlots()
+        public async Task<List<ParkingSlotDTO>> GetAllParkingSlots()
         {
             using var connection = _dapperContext.CreateConnection();
-            var parkSlots = await connection.QueryAsync<ParkingSlot>("[dbo].[GetAllParkingSlots]", 
+            var parkSlots = await connection.QueryAsync<ParkingSlotDTO>("[dbo].[GetAllParkingSlots]", 
                 commandType: CommandType.StoredProcedure);
 
             return parkSlots.ToList();
         }
 
-        //TODO: Add parking slot fixation
+        [HttpGet("GetFixedSlotWhereUserLicensePlate")]
+        public async Task<bool> GetFixedSlotWhereUserLicensePlate(string licensePlate)
+        {
+            using var connection = _dapperContext.CreateConnection();
+            var fixedSlotInfoList = await connection.QueryAsync<FixedSlot>("[dbo].[GetFixedSlotWhereUserLicensePlate]",
+                new { UserLicensePlate = licensePlate },
+                commandType: CommandType.StoredProcedure);
+            var fixedSlot = fixedSlotInfoList.FirstOrDefault(); 
+
+            if(fixedSlot == null)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
 
         [HttpPost("FixParkingSlot")]
         public async Task<ActionResult> FixParkingSlot(string selectedSlotName, double fixationHours)
         {
-            List<ParkingSlot> parkingSlots = new List<ParkingSlot>();
-            parkingSlots = await GetParkingSlots();
+            List<ParkingSlotDTO> parkingSlotsDTO = new List<ParkingSlotDTO>();
+            parkingSlotsDTO = await GetAllParkingSlots();
             ParkingSlot selectedSlot = new ParkingSlot();
 
-            foreach (var parkingSlot in parkingSlots)
+            foreach (var parkingSlot in parkingSlotsDTO)
             {
                 if (parkingSlot.Name == selectedSlotName.ToUpper())
                 {
-                    if(parkingSlot.IsFixed == true)
+                    if (parkingSlot.IsFixed == true)
                     {
-                        return BadRequest("Slot already taken.");
+                        return BadRequest("Слот уже занят.");
                     }
                     else
                     {
-                        selectedSlot.Id = parkingSlot.Id;
-                        selectedSlot.Name = parkingSlot.Name.ToUpper();
-                        selectedSlot.IsFixed = true;
-
-                        DateTime dateTimeNow = DateTime.Now;
-                        FixedSlot = new()
+                        if (User != null)
                         {
-                            FixationTime = Convert.ToDateTime(dateTimeNow.ToString("g")),
-                            FixationEndTime = Convert.ToDateTime(dateTimeNow.AddHours(fixationHours).ToString("g")),
-                            UserLicensePlate = LoginController.User.LicensePlate,
-                            ParkingSlotName = selectedSlot.Name.ToUpper()
-                        };
+                            if (await GetFixedSlotWhereUserLicensePlate(User.LicensePlate) == false)
+                            {
+                                selectedSlot.Id = parkingSlot.Id;
+                                selectedSlot.Name = parkingSlot.Name.ToUpper();
+                                selectedSlot.IsFixed = true;
 
-                        if (FixedSlot != null)
-                        {
-                            using var connection = _dapperContext.CreateConnection();
-
-                            connection.ExecuteScalar<ParkingSlot>("[dbo].[FixParkingSlot]",
-                                new { selectedSlot.IsFixed, selectedSlot.Name },
-                                commandType: CommandType.StoredProcedure);
-
-                            connection.ExecuteScalar<FixedSlot>("[dbo].[ListFixParkingSlot]",
-                                new
+                                DateTime dateTimeNow = DateTime.Now;
+                                FixedSlotInfo = new()
                                 {
-                                    fixationTime = FixedSlot.FixationTime,
-                                    fixationEndTime = FixedSlot.FixationEndTime,
-                                    parkingSlot = FixedSlot.ParkingSlotName,
-                                    userLicensePlate = FixedSlot.UserLicensePlate
-                                },
-                                commandType: CommandType.StoredProcedure);
-                            
-                            return Ok(FixedSlot);
+                                    FixationTime = Convert.ToDateTime(dateTimeNow.ToString("g")),
+                                    FixationEndTime = Convert.ToDateTime(dateTimeNow.AddHours(fixationHours).ToString("g")),
+                                    UserLicensePlate = LoginController.User.LicensePlate,
+                                    ParkingSlotName = selectedSlot.Name.ToUpper()
+                                };
+
+                                try
+                                {
+                                    if (FixedSlotInfo != null)
+                                    {
+                                        using var connection = _dapperContext.CreateConnection();
+                                        connection.ExecuteScalar<FixedSlot>("[dbo].[ListFixParkingSlot]",
+                                        new
+                                        {
+                                            fixationTime = FixedSlotInfo.FixationTime,
+                                            fixationEndTime = FixedSlotInfo.FixationEndTime,
+                                            parkingSlot = FixedSlotInfo.ParkingSlotName,
+                                            userLicensePlate = FixedSlotInfo.UserLicensePlate
+                                        },
+                                        commandType: CommandType.StoredProcedure);
+
+                                        connection.ExecuteScalar<ParkingSlot>("[dbo].[FixParkingSlot]",
+                                        new { selectedSlot.IsFixed, selectedSlot.Name },
+                                        commandType: CommandType.StoredProcedure);
+
+                                        return Ok(FixedSlotInfo);
+                                    }
+                                }
+                                catch (Microsoft.Data.SqlClient.SqlException e)
+                                {
+                                    return BadRequest(e.Message);
+                                }
+                            }
+                            return BadRequest("Нельзя забронировать больше одного места.");
                         }
                         else
                         {
-                            return BadRequest("FixedSlot is NULL");
+                            return BadRequest("Пользователь не найден.");
                         }
                     }
                 }
             }
-            return BadRequest("Слот не найден");
+            return BadRequest("Слот не найден.");
         }
 
-        [HttpPost("UnFixParkingSlot")]
-        public async Task<ActionResult> UnFixParkingSlot(string parkingSlotName)
-        {
-            if (LoginController.User.LicensePlate != null)
-            {
-                using var connection = _dapperContext.CreateConnection();
-                connection.ExecuteScalar<FixedSlot>("[dbo].[UnFixParkingSlot]", 
-                    new { slotName = parkingSlotName.ToUpper() }, 
-                    commandType: CommandType.StoredProcedure);
+        //[HttpPost("UnFixParkingSlot")]
+        //public async Task<ActionResult> UnFixParkingSlot(string unFixSlotName)
+        //{
+        //    if (User != null && User.LicensePlate == LoginController.User.LicensePlate)
+        //    {
+        //        using var connection = _dapperContext.CreateConnection();
 
-                connection.ExecuteScalar<ParkingSlot>("[dbo].[FixParkingSlot]",
-                    new { IsFixed = false, Name = parkingSlotName.ToUpper() },
-                    commandType: CommandType.StoredProcedure);
+        //        var fixedSlotsInfo = await connection.QueryAsync<FixedSlot>("[dbo].[GetFixedSlots]",
+        //            new { licensePlate = LoginController.User.LicensePlate },
+        //            commandType: CommandType.StoredProcedure);
+        //        string parkingSlotNameUpper = unFixSlotName;
 
-                return Ok("Success");
-            }
-            return BadRequest("No such user");
-        }
+        //        if(fixedSlotsInfo != null)
+        //        {
+        //            try
+        //            {
+        //                connection.ExecuteScalar<FixedSlot>("[dbo].[UnFixParkingSlot]",
+        //                    new { ParkingSlotName = parkingSlotNameUpper },
+        //                    commandType: CommandType.StoredProcedure);
+        //            }
+        //            catch(Exception e)
+        //            {
+        //                return BadRequest(e.Message);
+        //            }
+
+        //            connection.ExecuteScalar<ParkingSlot>("[dbo].[FixParkingSlot]",
+        //                new { IsFixed = false, Name = parkingSlotNameUpper },
+        //                commandType: CommandType.StoredProcedure);
+
+        //            return Ok("Success");
+        //        }
+        //    }
+        //    return BadRequest("User is null");
+        //}
     }
 }
